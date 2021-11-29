@@ -1,0 +1,168 @@
+#!/bin/bash
+#
+#See usage().
+#
+#Copyright (C) 2021  David Hobach  GPLv3
+#version: 0.3
+#
+#This program is free software: you can redistribute it and/or modify
+#it under the terms of the GNU General Public License as published by
+#the Free Software Foundation, either version 3 of the License, or
+#(at your option) any later version.
+#
+#This program is distributed in the hope that it will be useful,
+#but WITHOUT ANY WARRANTY; without even the implied warranty of
+#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#GNU General Public License for more details.
+#
+#You should have received a copy of the GNU General Public License
+#along with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+
+source blib
+eval "$B_SCRIPT"
+b_import "args"
+b_import "os/qubes4/dom0"
+
+b_deps "qvm-run" "qvm-shutdown" "date" "tail" "journalctl" "grep"
+b_dom0_setVMDeps "systemd-analyze"$'\n'"tail"
+
+QUBES_LOG_DIR="/var/log/qubes"
+
+#time measurements
+#t_: time in ms since epoch, d_: duration in ms
+declare -A TIMES=()
+
+function usage {
+echo "Usage: $B_SCRIPT_NAME [options] [vm]
+
+Analyze the VM startup performance of Qubes OS.
+
+[vm]: The VM to start & analyze.
+
+[options]:
+  -k: Keep the VM running (default: shut it down)."
+exit 1
+}
+
+#measure [id]
+#Store the current time measurement under [id].
+function measure {
+local id="$1"
+local now=
+now="$(date +%s%N)" || { B_ERR="Failed to retrieve the current time." ; B_E }
+TIMES["$id"]="${now::-6}"
+}
+
+#parseQubesLogTimestamp [timestamp] [id]
+function parseQubesLogTimestamp {
+local ts="$1"
+local id="$2"
+
+local ts_ns=
+ts_ns="$(date --date="$ts" +%s%N)" || { B_ERR="Failed to parse the following timestamp: $ts" ; B_E }
+TIMES["$id"]="${ts_ns::-6}"
+}
+
+#parseQubesLog [vm]
+function parseQubesLog {
+local vm="$1"
+local line log re
+
+local lfile="$QUBES_LOG_DIR/vm-$vm.log"
+if [ -f "$lfile" ] ; then
+  #Qubes 4.0
+  log="$(tail -n20 "$lfile")" || { B_ERR="Failed to read $lfile." ; B_E }
+  re='^([^ ]+ [^ ]+) (.*)$'
+else 
+  #Qubes 4.1
+  log="$(set -e -o pipefail ; journalctl -b0 -u qubesd -o short-iso-precise | grep " vm.$vm: ")" || { B_ERR="Failed to read the journal." ; B_E }
+  re='^([^ ]+) dom0 [^ ]+ [^ ]+ (.*)$'
+fi
+
+while IFS= read -r line ; do
+  [[ "$line" =~ $re ]] || { B_ERR="Unexpected log format: $line" ; B_E }
+  local ts="${BASH_REMATCH[1]}"
+  local msg="${BASH_REMATCH[2]}"
+
+  if [[ "$msg" == "Starting $vm" ]] ; then
+    parseQubesLogTimestamp "$ts" "t_xen_start"
+  elif [[ "$msg" == "Setting Qubes DB info for the VM" ]] || [[ "$msg" == "Creating"* ]] || [[ "$msg" == "Removing"* ]]; then
+    :
+  elif [[ "$msg" == "Starting Qubes DB" ]] ; then
+    parseQubesLogTimestamp "$ts" "t_xen_qubesdb_start"
+  elif [[ "$msg" == "Activating the $vm VM" ]] ; then
+    parseQubesLogTimestamp "$ts" "t_xen_end"
+  else
+    b_info "Unexpected log message, ignoring: $msg"
+  fi
+done <<< "$log"
+return 0
+}
+
+function parseCritChain {
+local chain="$1"
+local id="$2"
+
+local line=
+IFS= read -r line <<< "$chain"
+
+local re='^([^ ]+) @([0-9\.]+)(m?s)$'
+[[ "$line" =~ $re ]] || { B_ERR="Unexpected critical chain format for $id: $line" ; B_E }
+local duration="${BASH_REMATCH[2]}"
+duration="${duration/\./}"
+TIMES["$id"]="$duration"
+}
+
+function prefix {
+local prefix="$1"
+local txt="$2"
+
+local line=
+while IFS= read -r line ; do
+  echo "$prefix$line"
+done <<< "$txt"
+}
+
+function main {
+b_args_init 1 "-k" 0
+b_args_parse "$@"
+[ $(b_args_getCount) -eq 1 ] || usage
+local vm="$(b_args_get 0)"
+
+b_dom0_isHalted "$vm" || { B_ERR="The VM $vm must be halted." ; B_E }
+
+measure "t_qrexec_start"
+qvm-run -p "$vm" 'echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E }
+measure "t_qrexec_end"
+
+local crit_chain_system crit_chain_user
+crit_chain_system="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the system critical chain." ; B_E }
+crit_chain_user="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze --user critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the user critical chain." ; B_E }
+
+if ! b_args_getOption "-k" > /dev/null ; then
+  qvm-shutdown "$vm" || { B_ERR="Failed to shut down the VM $vm." ; B_E }
+fi
+
+#parse
+parseQubesLog "$vm"
+parseCritChain "$crit_chain_system" "d_crit_system"
+parseCritChain "$crit_chain_user" "d_crit_user"
+
+#print
+echo "Xen:
+  qrexec startup: $(( ${TIMES["t_xen_start"]} - ${TIMES["t_qrexec_start"]} )) ms
+  Qubes DB: $(( ${TIMES["t_xen_qubesdb_start"]} - ${TIMES["t_xen_start"]} )) ms
+  VM handover: $(( ${TIMES["t_xen_end"]} - ${TIMES["t_xen_start"]} )) ms
+Linux:
+  system: ${TIMES["d_crit_system"]} ms
+  user: ${TIMES["d_crit_user"]} ms
+  system critical-chain:
+$(prefix "    " "$crit_chain_system")
+  user critical-chain:
+$(prefix "    " "$crit_chain_user")
+  qrexec call: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} )) ms
+Overall: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_qrexec_start"]} )) ms"
+}
+
+main "$@"
