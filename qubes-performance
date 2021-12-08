@@ -165,7 +165,7 @@ Linux:
 $(prefix "    " "$crit_chain_system")
   user critical-chain:
 $(prefix "    " "$crit_chain_user")
-  qubes.getDate: $getDate
+  qubes.GetDate: $getDate
   qubes.WindowIconUpdater: $windowIcon
   exec time: $(( ${TIMES["t_exec"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} )) ms (depends on clock sync)
   qrexec return: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} )) ms
