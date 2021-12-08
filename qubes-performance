@@ -27,8 +27,6 @@ b_import "os/qubes4/dom0"
 b_deps "qvm-run" "qvm-shutdown" "date" "tail" "journalctl" "grep"
 b_dom0_setVMDeps "systemd-analyze"$'\n'"tail"
 
-QUBES_LOG_DIR="/var/log/qubes"
-
 #time measurements
 #t_: time in ms since epoch, d_: duration in ms
 declare -A TIMES=()
@@ -69,32 +67,27 @@ function parseQubesLog {
 local vm="$1"
 local line log re
 
-local lfile="$QUBES_LOG_DIR/vm-$vm.log"
-if [ -f "$lfile" ] ; then
-  #Qubes 4.0
-  log="$(tail -n20 "$lfile")" || { B_ERR="Failed to read $lfile." ; B_E }
-  re='^([^ ]+ [^ ]+) (.*)$'
-else 
-  #Qubes 4.1
-  log="$(set -e -o pipefail ; journalctl -b0 -u qubesd -o short-iso-precise | grep " vm.$vm: ")" || { B_ERR="Failed to read the journal." ; B_E }
-  re='^([^ ]+) dom0 [^ ]+ [^ ]+ (.*)$'
-fi
+log="$(set -e -o pipefail ; journalctl -b0 -o short-precise | grep "$vm")" || { B_ERR="Failed to read the journal." ; B_E }
+re='^([^ ]+ [^ ]+ [^ ]+) dom0 ([^ ]+ [^ ]+ .*)$'
 
 while IFS= read -r line ; do
   [[ "$line" =~ $re ]] || { B_ERR="Unexpected log format: $line" ; B_E }
   local ts="${BASH_REMATCH[1]}"
   local msg="${BASH_REMATCH[2]}"
 
-  if [[ "$msg" == "Starting $vm" ]] ; then
+  if [[ "$msg" == *"Starting $vm" ]] ; then
     parseQubesLogTimestamp "$ts" "t_xen_start"
-  elif [[ "$msg" == "Setting Qubes DB info for the VM" ]] || [[ "$msg" == "Creating"* ]] || [[ "$msg" == "Removing"* ]]; then
-    :
-  elif [[ "$msg" == "Starting Qubes DB" ]] ; then
+  elif [[ "$msg" == *"Starting Qubes DB" ]] ; then
     parseQubesLogTimestamp "$ts" "t_xen_qubesdb_start"
-  elif [[ "$msg" == "Activating the $vm VM" ]] ; then
+  elif [[ "$msg" == *"Activating the $vm VM" ]] ; then
     parseQubesLogTimestamp "$ts" "t_xen_end"
+  elif [[ "$msg" == *"qubes.GetDate"*"allowed"* ]] ; then
+    parseQubesLogTimestamp "$ts" "t_qubes_get_date"
+  elif [[ "$msg" == *"qubes.WindowIconUpdater"*"allowed"* ]] ; then
+    parseQubesLogTimestamp "$ts" "t_qubes_window_icon_updater"
   else
-    b_info "Unexpected log message, ignoring: $msg"
+    :
+    #b_info "Unexpected log message, ignoring: $msg"
   fi
 done <<< "$log"
 return 0
@@ -153,10 +146,17 @@ parseQubesLog "$vm"
 parseCritChain "$crit_chain_system" "d_crit_system"
 parseCritChain "$crit_chain_user" "d_crit_user"
 
+local qubesdb=$(( ${TIMES["t_xen_qubesdb_start"]} - ${TIMES["t_xen_start"]} ))
+[ $qubesdb -gt 0 ] && qubesdb="$qubesdb ms" || qubesdb="n/a"
+local getDate=$(( ${TIMES["t_qubes_get_date"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} ))
+[ $getDate -gt 0 ] && getDate="$getDate ms" || getDate="n/a"
+local windowIcon=$(( ${TIMES["t_qubes_window_icon_updater"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} ))
+[ $windowIcon -gt 0 ] && windowIcon="$windowIcon ms" || windowIcon="n/a"
+
 #print
 echo "Xen:
   qrexec startup: $(( ${TIMES["t_xen_start"]} - ${TIMES["t_qrexec_start"]} )) ms
-  Qubes DB: $(( ${TIMES["t_xen_qubesdb_start"]} - ${TIMES["t_xen_start"]} )) ms
+  Qubes DB: $qubesdb
   VM handover: $(( ${TIMES["t_xen_end"]} - ${TIMES["t_xen_start"]} )) ms
 Linux:
   system: ${TIMES["d_crit_system"]} ms
@@ -165,6 +165,8 @@ Linux:
 $(prefix "    " "$crit_chain_system")
   user critical-chain:
 $(prefix "    " "$crit_chain_user")
+  qubes.getDate: $getDate
+  qubes.WindowIconUpdater: $windowIcon
   exec time: $(( ${TIMES["t_exec"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} )) ms (depends on clock sync)
   qrexec return: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} )) ms
 Overall: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_qrexec_start"]} )) ms"
