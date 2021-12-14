@@ -24,7 +24,7 @@ eval "$B_SCRIPT"
 b_import "args"
 b_import "os/qubes4/dom0"
 
-b_deps "qvm-run" "qvm-shutdown" "date" "tail" "journalctl" "grep"
+b_deps "qvm-run" "qvm-shutdown" "date" "tail" "journalctl" "grep" "touch" "perf" "sudo"
 b_dom0_setVMDeps "systemd-analyze"$'\n'"tail"
 
 #time measurements
@@ -39,7 +39,8 @@ Analyze the VM startup performance of Qubes OS.
 [vm]: The VM to start & analyze.
 
 [options]:
-  -k: Keep the VM running (default: shut it down)."
+  -k: Keep the VM running (default: shut it down).
+  -p: Store perf data in [vm].perf (will overwrite!)"
 exit 1
 }
 
@@ -71,7 +72,7 @@ log="$(set -e -o pipefail ; journalctl -b0 -o short-precise | grep "$vm")" || { 
 re='^([^ ]+ [^ ]+ [^ ]+) dom0 ([^ ]+ [^ ]+ .*)$'
 
 while IFS= read -r line ; do
-  [[ "$line" =~ $re ]] || { B_ERR="Unexpected log format: $line" ; B_E }
+  [[ "$line" =~ $re ]] || continue
   local ts="${BASH_REMATCH[1]}"
   local msg="${BASH_REMATCH[2]}"
 
@@ -118,16 +119,27 @@ done <<< "$txt"
 }
 
 function main {
-b_args_init 1 "-k" 0
+b_args_init 1 "-k" 0 "-p" 0
 b_args_parse "$@"
 [ $(b_args_getCount) -eq 1 ] || usage
 local vm="$(b_args_get 0)"
 
 b_dom0_isHalted "$vm" || { B_ERR="The VM $vm must be halted." ; B_E }
 
-measure "t_qrexec_start"
-qvm-run -p "$vm" 'date +%s%N &> /tmp/qubes-performance.txt ; echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E }
-measure "t_qrexec_end"
+if ! b_args_getOption "-p" > /dev/null ; then
+  measure "t_qrexec_start"
+  qvm-run -p "$vm" 'date +%s%N &> /tmp/qubes-performance.txt ; echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E }
+  measure "t_qrexec_end"
+else
+  local ofile="$vm.perf"
+  sudo rm -f "$ofile" &> /dev/null #prevent perf to write an .old file
+  touch "$ofile" #to get a non-root output file
+
+  measure "t_qrexec_start"
+  #NOTE: we need sudo to collect as many events as possible
+  sudo perf record --call-graph dwarf -o "$ofile" -- qvm-run -p "$vm" 'date +%s%N &> /tmp/qubes-performance.txt ; echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E }
+  measure "t_qrexec_end"
+fi
 
 local crit_chain_system crit_chain_user
 crit_chain_system="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the system critical chain." ; B_E }
