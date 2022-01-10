@@ -141,6 +141,11 @@ else
   measure "t_qrexec_end"
 fi
 
+TIMES["d_kernel"]="$(b_dom0_execStrIn "$vm" "systemd-analyze time")" || { B_ERR="Failed to obtain the systemd timings." ; B_E }
+local re=' ([0-9]+)\.([0-9]+)s \(kernel\)'
+[[ ${TIMES["d_kernel"]} =~ $re ]] || { B_ERR="Unexpected kernel output from the VM $vm. Maybe an attack?" ; B_E }
+TIMES["d_kernel"]="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
+
 local crit_chain_system crit_chain_user
 crit_chain_system="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the system critical chain." ; B_E }
 crit_chain_user="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze --user critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the user critical chain." ; B_E }
@@ -171,6 +176,7 @@ echo "Xen:
   Qubes DB: $qubesdb
   VM handover: $(( ${TIMES["t_xen_end"]} - ${TIMES["t_xen_start"]} )) ms
 Linux:
+  kernel: ${TIMES["d_kernel"]} ms
   system: ${TIMES["d_crit_system"]} ms
   user: ${TIMES["d_crit_user"]} ms
   system critical-chain:
