@@ -165,9 +165,9 @@ parseCritChain "$crit_chain_user" "d_crit_user"
 
 local qubesdb=$(( ${TIMES["t_xen_qubesdb_start"]} - ${TIMES["t_xen_start"]} ))
 [ $qubesdb -gt 0 ] && qubesdb="$qubesdb ms" || qubesdb="n/a"
-local getDate=$(( ${TIMES["t_qubes_get_date"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} ))
+local getDate=$(( ${TIMES["t_qubes_get_date"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_kernel"]} ))
 [ $getDate -gt 0 ] && getDate="$getDate ms" || getDate="n/a"
-local windowIcon=$(( ${TIMES["t_qubes_window_icon_updater"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} ))
+local windowIcon=$(( ${TIMES["t_qubes_window_icon_updater"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_kernel"]} ))
 [ $windowIcon -gt 0 ] && windowIcon="$windowIcon ms" || windowIcon="n/a"
 
 #print
@@ -185,8 +185,8 @@ $(prefix "    " "$crit_chain_system")
 $(prefix "    " "$crit_chain_user")
   qubes.GetDate: $getDate
   qubes.WindowIconUpdater: $windowIcon
-  exec time: $(( ${TIMES["t_exec"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} )) ms (depends on clock sync)
-  qrexec return: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} )) ms
+  exec time: $(( ${TIMES["t_exec"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} - ${TIMES["d_kernel"]} )) ms (depends on clock sync)
+  qrexec return: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} - ${TIMES["d_kernel"]} )) ms
 Overall: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_qrexec_start"]} )) ms"
 }
 
