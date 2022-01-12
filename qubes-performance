@@ -2,8 +2,8 @@
 #
 #See usage().
 #
-#Copyright (C) 2021  David Hobach  GPLv3
-#version: 0.4
+#Copyright (C) 2022  David Hobach  GPLv3
+#version: 0.5
 #
 #This program is free software: you can redistribute it and/or modify
 #it under the terms of the GNU General Public License as published by
@@ -141,18 +141,25 @@ else
   measure "t_qrexec_end"
 fi
 
+#2nd qrexec call on running VM
+measure "t_qrexec2_start"
+qvm-run -p "$vm" 'date +%s%N &>> /tmp/qubes-performance.txt ; echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E }
+measure "t_qrexec2_end"
+
 TIMES["d_kernel"]="$(b_dom0_execStrIn "$vm" "systemd-analyze time")" || { B_ERR="Failed to obtain the systemd timings." ; B_E }
 local re=' ([0-9]+)\.([0-9]+)s \(kernel\)'
 [[ ${TIMES["d_kernel"]} =~ $re ]] || { B_ERR="Unexpected kernel output from the VM $vm. Maybe an attack?" ; B_E }
 TIMES["d_kernel"]="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
 
-local crit_chain_system crit_chain_user
+local crit_chain_system crit_chain_user untrusted untrusted_line
 crit_chain_system="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the system critical chain." ; B_E }
 crit_chain_user="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze --user critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the user critical chain." ; B_E }
-TIMES["t_exec"]="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; cat /tmp/qubes-performance.txt ; rm -f /tmp/qubes-performance.txt")" || { B_ERR="Failed to obtain the system time." ; B_E }
+untrusted="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; cat /tmp/qubes-performance.txt ; rm -f /tmp/qubes-performance.txt")" || { B_ERR="Failed to obtain the system time." ; B_E }
 local re='^[0-9]+$'
-[[ ${TIMES["t_exec"]} =~ $re ]] || { B_ERR="Unexpected output from the VM $vm. Maybe an attack?" ; B_E }
-TIMES["t_exec"]="${TIMES["t_exec"]::-6}"
+IFS= read -r untrusted_line <<< "$untrusted"
+[[ $untrusted_line =~ $re ]] && TIMES["t_exec"]="${untrusted_line::-6}" || { B_ERR="Unexpected output from the VM $vm. Maybe an attack?" ; B_E }
+{ IFS= read -r untrusted_line ; IFS= read -r untrusted_line ; } <<< "$untrusted"
+[[ $untrusted_line =~ $re ]] && TIMES["t_exec2"]="${untrusted_line::-6}" || { B_ERR="Unexpected output from the VM $vm. Maybe an attack?" ; B_E }
 
 if ! b_args_getOption "-k" > /dev/null ; then
   qvm-shutdown "$vm" || { B_ERR="Failed to shut down the VM $vm." ; B_E }
@@ -185,9 +192,13 @@ $(prefix "    " "$crit_chain_system")
 $(prefix "    " "$crit_chain_user")
   qubes.GetDate: $getDate
   qubes.WindowIconUpdater: $windowIcon
+qrexec (1st run):
   exec time: $(( ${TIMES["t_exec"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} - ${TIMES["d_kernel"]} )) ms (depends on clock sync)
-  qrexec return: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} - ${TIMES["d_kernel"]} )) ms
-Overall: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_qrexec_start"]} )) ms"
+  return: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} - ${TIMES["d_kernel"]} )) ms
+qrexec (2nd run):
+  exec time: $(( ${TIMES["t_exec2"]} - ${TIMES["t_qrexec2_start"]} )) ms (depends on clock sync)
+  return: $(( ${TIMES["t_qrexec2_end"]} - ${TIMES["t_qrexec2_start"]} )) ms
+Overall: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_qrexec_start"]} )) ms (excl. 2nd qrexec run)"
 }
 
 main "$@"
