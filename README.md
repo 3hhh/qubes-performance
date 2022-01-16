@@ -6,38 +6,43 @@ Example output:
 
 ```
 Xen:
-  qrexec startup: 123 ms
-  Qubes DB: 3150 ms
-  VM handover: 3196 ms
+  qrexec startup: 126 ms
+  Qubes DB: 3461 ms
+  VM handover: 3511 ms
 Linux:
-  system: 4336 ms
-  user: 55 ms
+  kernel: 1344 ms
+  system: 4220 ms
+  user: 91 ms
   system critical-chain:
-    multi-user.target @4.336s
-    └─qubes-misc-post.service @4.166s +169ms
-      └─basic.target @3.865s
-        └─sockets.target @3.865s
-          └─cups.socket @3.865s
-            └─sysinit.target @3.862s
-              └─qubes-early-vm-config.service @3.807s +52ms
-                └─local-fs.target @3.796s
-                  └─run-user-1000.mount @4.224s
-                    └─local-fs-pre.target @3.796s
-                      └─lvm2-monitor.service @246ms +3.548s
-                        └─dm-event.socket @228ms
-                          └─-.mount @155ms
-                            └─systemd-journald.socket @217ms
-                              └─-.mount @155ms
-                                └─...
+    multi-user.target @4.220s
+    └─qubes-misc-post.service @4.005s +213ms
+      └─basic.target @3.712s
+        └─sockets.target @3.712s
+          └─cups.socket @3.712s
+            └─sysinit.target @3.707s
+              └─qubes-early-vm-config.service @3.663s +42ms
+                └─local-fs.target @3.662s
+                  └─run-user-1000.mount @4.050s
+                    └─local-fs-pre.target @3.626s
+                      └─lvm2-monitor.service @266ms +3.360s
+                        └─systemd-journald.socket @219ms
+                          └─system.slice @150ms
+                            └─-.slice @150ms
   user critical-chain:
-    default.target @55ms
-    └─basic.target @54ms
-      └─sockets.target @54ms
-        └─dbus.socket @47ms +6ms
-          └─-.mount @37ms
-            └─-.slice @37ms
-  qrexec call: 2450 ms
-Overall: 10105 ms
+    default.target @91ms
+    └─basic.target @88ms
+      └─sockets.target @88ms
+        └─dbus.socket @80ms +7ms
+          └─-.slice @71ms
+  qubes.GetDate: n/a
+  qubes.WindowIconUpdater: 808 ms
+qrexec (1st run):
+  exec time: 1090 ms (depends on clock sync)
+  return: 1144 ms
+qrexec (2nd run):
+  exec time: 218 ms (depends on clock sync)
+  return: 265 ms
+Overall: 10345 ms (excl. 2nd qrexec run)
 ```
 
 ## Installation
