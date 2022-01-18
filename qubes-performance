@@ -3,7 +3,7 @@
 #See usage().
 #
 #Copyright (C) 2022  David Hobach  GPLv3
-#version: 0.5
+#version: 0.6
 #
 #This program is free software: you can redistribute it and/or modify
 #it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ eval "$B_SCRIPT"
 b_import "args"
 b_import "os/qubes4/dom0"
 
-b_deps "qvm-run" "qvm-shutdown" "date" "tail" "journalctl" "grep" "touch" "perf" "sudo"
+b_deps "qvm-run" "qvm-shutdown" "date" "tail" "journalctl" "grep" "touch" "perf" "sudo" "sed" "dnf" "uname" "cat" "qvm-prefs"
 b_dom0_setVMDeps "systemd-analyze"$'\n'"tail"
 
 #time measurements
@@ -40,7 +40,9 @@ Analyze the VM startup performance of Qubes OS.
 
 [options]:
   -k: Keep the VM running (default: shut it down).
-  -p: Store perf data in [vm].perf (will overwrite!)"
+  -p: Store perf data in [vm].perf (will overwrite!)
+  -n: Don't print the kernel & Xen version header.
+  -h: Print this help and exit."
 exit 1
 }
 
@@ -118,10 +120,16 @@ while IFS= read -r line ; do
 done <<< "$txt"
 }
 
+function get_xen_version {
+dnf info xen installed | sed -rn 's/.*Version[[:space:]]+: ([0-9\.]+).*/\1/p'
+}
+
 function main {
-b_args_init 1 "-k" 0 "-p" 0
+b_args_init 1 "-k" 0 "-p" 0 "-h" 0 "-n" 0
 b_args_parse "$@"
 [ $(b_args_getCount) -eq 1 ] || usage
+b_args_getOption "-h" > /dev/null && usage
+
 local vm="$(b_args_get 0)"
 
 b_dom0_isHalted "$vm" || { B_ERR="The VM $vm must be halted." ; B_E }
@@ -177,7 +185,15 @@ local getDate=$(( ${TIMES["t_qubes_get_date"]} - ${TIMES["t_xen_end"]} - ${TIMES
 local windowIcon=$(( ${TIMES["t_qubes_window_icon_updater"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} - ${TIMES["d_kernel"]} ))
 [ $windowIcon -gt 0 ] && windowIcon="$windowIcon ms" || windowIcon="n/a"
 
-#print
+#print header
+if ! b_args_getOption "-n" > /dev/null ; then
+  cat "/etc/qubes-release"
+  echo "dom0 kernel: $(uname -r)
+dom0 Xen: $(get_xen_version)
+VM kernel: $(qvm-prefs "$vm" "kernel")"$'\n'
+fi
+
+#print performance info
 echo "Xen:
   qrexec startup: $(( ${TIMES["t_xen_start"]} - ${TIMES["t_qrexec_start"]} )) ms
   Qubes DB: $qubesdb
