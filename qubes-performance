@@ -156,10 +156,10 @@ local re=' ([0-9]+)\.([0-9]+)s \(kernel\)'
 [[ ${TIMES["d_kernel"]} =~ $re ]] || { B_ERR="Unexpected kernel output from the VM $vm. Maybe an attack?" ; B_E }
 TIMES["d_kernel"]="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
 
-local crit_chain_system crit_chain_user crit_chain_qservice
+local crit_chain_system crit_chain_user crit_chain_qrexec
 crit_chain_system="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the system critical chain." ; B_E }
 crit_chain_user="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze --user critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the user critical chain." ; B_E }
-crit_chain_qservice="$(b_dom0_execStrIn "$vm" "systemd-analyze critical-chain qubes-qrexec-agent.service")" || { B_ERR="Failed to obtain the qubes-qrexec-agent timings." ; B_E }
+crit_chain_qrexec="$(b_dom0_execStrIn "$vm" "systemd-analyze critical-chain qubes-qrexec-agent.service | tail -n+4")" || { B_ERR="Failed to obtain the qubes-qrexec-agent timings." ; B_E }
 
 local untrusted untrusted_line
 untrusted="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; cat /tmp/qubes-performance.txt ; rm -f /tmp/qubes-performance.txt")" || { B_ERR="Failed to obtain the system time." ; B_E }
@@ -177,7 +177,7 @@ fi
 parseQubesLog "$vm"
 parseCritChain "$crit_chain_system" "d_crit_system"
 parseCritChain "$crit_chain_user" "d_crit_user"
-parseCritChain "$crit_chain_qservice" "d_crit_qrexec"
+parseCritChain "$crit_chain_qrexec" "d_crit_qrexec"
 
 local qubesdb=$(( ${TIMES["t_xen_qubesdb_start"]} - ${TIMES["t_xen_start"]} ))
 [ $qubesdb -gt 0 ] && qubesdb="$qubesdb ms" || qubesdb="n/a"
@@ -205,8 +205,8 @@ Linux:
   user: ${TIMES["d_crit_user"]} ms
   system critical-chain:
 $(prefix "    " "$crit_chain_system")
-  user critical-chain:
-$(prefix "    " "$crit_chain_user")
+  qrexec service critical-chain:
+$(prefix "    " "$crit_chain_qrexec")
   qubes.GetDate: $getDate
   qubes.WindowIconUpdater: $windowIcon
   qrexec service: ${TIMES["d_crit_qrexec"]} ms
