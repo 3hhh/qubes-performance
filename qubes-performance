@@ -100,12 +100,9 @@ function parseCritChain {
 local chain="$1"
 local id="$2"
 
-local line=
-IFS= read -r line <<< "$chain"
-
-local re='^([^ ]+) @([0-9\.]+)(m?s)$'
-[[ "$line" =~ $re ]] || { B_ERR="Unexpected critical chain format for $id: $line" ; B_E }
-local duration="${BASH_REMATCH[2]}"
+local re=' @([0-9\.]+)(m?s)' #simply match on the first
+[[ "$chain" =~ $re ]] || { B_ERR="Unexpected critical chain format for $id. Please investigate." ; B_E }
+local duration="${BASH_REMATCH[1]}"
 duration="${duration/\./}"
 TIMES["$id"]="$duration"
 }
@@ -159,9 +156,12 @@ local re=' ([0-9]+)\.([0-9]+)s \(kernel\)'
 [[ ${TIMES["d_kernel"]} =~ $re ]] || { B_ERR="Unexpected kernel output from the VM $vm. Maybe an attack?" ; B_E }
 TIMES["d_kernel"]="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
 
-local crit_chain_system crit_chain_user untrusted untrusted_line
+local crit_chain_system crit_chain_user crit_chain_qservice
 crit_chain_system="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the system critical chain." ; B_E }
 crit_chain_user="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze --user critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the user critical chain." ; B_E }
+crit_chain_qservice="$(b_dom0_execStrIn "$vm" "systemd-analyze critical-chain qubes-qrexec-agent.service")" || { B_ERR="Failed to obtain the qubes-qrexec-agent timings." ; B_E }
+
+local untrusted untrusted_line
 untrusted="$(b_dom0_execStrIn "$vm" "set -e -o pipefail ; cat /tmp/qubes-performance.txt ; rm -f /tmp/qubes-performance.txt")" || { B_ERR="Failed to obtain the system time." ; B_E }
 local re='^[0-9]+$'
 IFS= read -r untrusted_line <<< "$untrusted"
@@ -177,12 +177,13 @@ fi
 parseQubesLog "$vm"
 parseCritChain "$crit_chain_system" "d_crit_system"
 parseCritChain "$crit_chain_user" "d_crit_user"
+parseCritChain "$crit_chain_qservice" "d_crit_qrexec"
 
 local qubesdb=$(( ${TIMES["t_xen_qubesdb_start"]} - ${TIMES["t_xen_start"]} ))
 [ $qubesdb -gt 0 ] && qubesdb="$qubesdb ms" || qubesdb="n/a"
-local getDate=$(( ${TIMES["t_qubes_get_date"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} - ${TIMES["d_kernel"]} ))
+local getDate=$(( ${TIMES["t_qubes_get_date"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_qrexec"]} - ${TIMES["d_kernel"]} ))
 [ $getDate -gt 0 ] && getDate="$getDate ms" || getDate="n/a"
-local windowIcon=$(( ${TIMES["t_qubes_window_icon_updater"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} - ${TIMES["d_kernel"]} ))
+local windowIcon=$(( ${TIMES["t_qubes_window_icon_updater"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_qrexec"]} - ${TIMES["d_kernel"]} ))
 [ $windowIcon -gt 0 ] && windowIcon="$windowIcon ms" || windowIcon="n/a"
 
 #print header
@@ -208,9 +209,10 @@ $(prefix "    " "$crit_chain_system")
 $(prefix "    " "$crit_chain_user")
   qubes.GetDate: $getDate
   qubes.WindowIconUpdater: $windowIcon
+  qrexec service: ${TIMES["d_crit_qrexec"]} ms
 qrexec (1st run):
-  exec time: $(( ${TIMES["t_exec"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} - ${TIMES["d_kernel"]} )) ms (depends on clock sync)
-  return: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_system"]} - ${TIMES["d_kernel"]} )) ms
+  exec time: $(( ${TIMES["t_exec"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_qrexec"]} - ${TIMES["d_kernel"]} )) ms (depends on clock sync)
+  return: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_qrexec"]} - ${TIMES["d_kernel"]} )) ms
 qrexec (2nd run):
   exec time: $(( ${TIMES["t_exec2"]} - ${TIMES["t_qrexec2_start"]} )) ms (depends on clock sync)
   return: $(( ${TIMES["t_qrexec2_end"]} - ${TIMES["t_qrexec2_start"]} )) ms
