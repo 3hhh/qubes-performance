@@ -151,7 +151,7 @@ measure "t_qrexec2_start"
 qvm-run -p "$vm" 'date +%s%N &>> /tmp/qubes-performance.txt ; echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E }
 measure "t_qrexec2_end"
 
-TIMES["d_kernel"]="$(b_dom0_execStrIn "$vm" "systemd-analyze time")" || { B_ERR="Failed to obtain the systemd timings." ; B_E }
+TIMES["d_kernel"]="$(b_dom0_execStrIn "$vm" "systemctl is-system-running --wait &> /dev/null ; systemd-analyze time")" || { B_ERR="Failed to obtain the systemd timings." ; B_E }
 local re=' ([0-9]+)\.([0-9]+)s \(kernel\)'
 [[ ${TIMES["d_kernel"]} =~ $re ]] || { B_ERR="Unexpected kernel output from the VM $vm. Maybe an attack?" ; B_E }
 TIMES["d_kernel"]="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
