@@ -25,6 +25,8 @@ b_import "args"
 b_import "types"
 b_import "os/qubes4/dom0"
 
+B_TYPES_ENCODING="utf-8"
+
 b_deps "qvm-run" "qvm-shutdown" "date" "tail" "journalctl" "grep" "touch" "perf" "sudo" "sed" "dnf" "uname" "cat" "qvm-prefs"
 b_dom0_setVMDeps "systemd-analyze"$'\n'"tail"
 
@@ -122,20 +124,6 @@ function get_xen_version {
 dnf info xen installed | sed -rn 's/.*Version[[:space:]]+: ([0-9\.]+).*/\1/p'
 }
 
-#retrieve_untrusted_vm_data [vm] [command]
-#returns: untrusted String
-function retrieve_untrusted_vm_data {
-local vm="$1"
-local cmd="$2"
-set -o pipefail
-local ret=
-#sanitize binary VM output
-b_dom0_execStrIn "$vm" "$cmd" | b_types_parseString "utf-8"
-ret=$?
-set +o pipefail
-return $ret
-}
-
 function main {
 b_args_init 1 "-k" 0 "-p" 0 "-h" 0 "-n" 0
 b_args_parse "$@"
@@ -166,18 +154,18 @@ measure "t_qrexec2_start"
 qvm-run -p "$vm" 'date +%s%N &>> /tmp/qubes-performance.txt ; echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E }
 measure "t_qrexec2_end"
 
-TIMES["d_kernel"]="$(retrieve_untrusted_vm_data "$vm" "systemctl is-system-running --wait &> /dev/null ; systemd-analyze time")" || { B_ERR="Failed to obtain the systemd timings." ; B_E }
+TIMES["d_kernel"]="$(b_types_str b_dom0_execStrIn "$vm" "systemctl is-system-running --wait &> /dev/null ; systemd-analyze time")" || { B_ERR="Failed to obtain the systemd timings." ; B_E }
 local re=' ([0-9]+)\.([0-9]+)s \(kernel\)'
 [[ ${TIMES["d_kernel"]} =~ $re ]] || { B_ERR="Unexpected kernel output from the VM $vm. Maybe an attack?" ; B_E }
 TIMES["d_kernel"]="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
 
 local crit_chain_system crit_chain_user crit_chain_qrexec
-crit_chain_system="$(retrieve_untrusted_vm_data "$vm" "set -e -o pipefail ; systemd-analyze critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the system critical chain." ; B_E }
-crit_chain_user="$(retrieve_untrusted_vm_data "$vm" "set -e -o pipefail ; systemd-analyze --user critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the user critical chain." ; B_E }
-crit_chain_qrexec="$(retrieve_untrusted_vm_data "$vm" "systemd-analyze critical-chain qubes-qrexec-agent.service | tail -n+4")" || { B_ERR="Failed to obtain the qubes-qrexec-agent timings." ; B_E }
+crit_chain_system="$(b_types_str b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the system critical chain." ; B_E }
+crit_chain_user="$(b_types_str b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze --user critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the user critical chain." ; B_E }
+crit_chain_qrexec="$(b_types_str b_dom0_execStrIn "$vm" "systemd-analyze critical-chain qubes-qrexec-agent.service | tail -n+4")" || { B_ERR="Failed to obtain the qubes-qrexec-agent timings." ; B_E }
 
 local untrusted untrusted_line
-untrusted="$(retrieve_untrusted_vm_data "$vm" "set -e -o pipefail ; cat /tmp/qubes-performance.txt ; rm -f /tmp/qubes-performance.txt")" || { B_ERR="Failed to obtain the system time." ; B_E }
+untrusted="$(b_types_str b_dom0_execStrIn "$vm" "set -e -o pipefail ; cat /tmp/qubes-performance.txt ; rm -f /tmp/qubes-performance.txt")" || { B_ERR="Failed to obtain the system time." ; B_E }
 local re='^[0-9]+$'
 IFS= read -r untrusted_line <<< "$untrusted"
 [[ $untrusted_line =~ $re ]] && TIMES["t_exec"]="${untrusted_line::-6}" || { B_ERR="Unexpected output from the VM $vm. Maybe an attack?" ; B_E }
