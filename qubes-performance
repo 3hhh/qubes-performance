@@ -26,6 +26,7 @@ b_import "types"
 b_import "os/qubes4/dom0"
 
 B_TYPES_ENCODING="utf-8"
+B_DOM0_QVM_RUN_PARAMS=("--no-gui")
 
 b_deps "qvm-run" "qvm-shutdown" "date" "tail" "journalctl" "grep" "touch" "perf" "sudo" "sed" "dnf" "uname" "cat" "qvm-prefs"
 b_dom0_setVMDeps "systemd-analyze"$'\n'"tail"
