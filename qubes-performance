@@ -74,7 +74,7 @@ function parseQubesLog {
 local vm="$1"
 local line log re
 
-log="$(set -e -o pipefail ; journalctl -b0 -o short-precise | grep "$vm")" || { B_ERR="Failed to read the journal." ; B_E }
+log="$(set -e -o pipefail ; journalctl -u "qubesd" -b0 -o short-precise | grep "$vm")" || { B_ERR="Failed to read the journal." ; B_E }
 re='^([^ ]+ [^ ]+ [^ ]+) dom0 ([^ ]+ [^ ]+ .*)$'
 
 while IFS= read -r line ; do
