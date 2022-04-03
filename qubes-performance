@@ -55,7 +55,7 @@ exit 1
 function measure {
 local id="$1"
 local now=
-now="$(date +%s%N)" || { B_ERR="Failed to retrieve the current time." ; B_E }
+now="$(date +%s%N)" || { B_ERR="Failed to retrieve the current time." ; B_E ; }
 TIMES["$id"]="${now::-6}"
 }
 
@@ -65,7 +65,7 @@ local ts="$1"
 local id="$2"
 
 local ts_ns=
-ts_ns="$(date --date="$ts" +%s%N)" || { B_ERR="Failed to parse the following timestamp: $ts" ; B_E }
+ts_ns="$(date --date="$ts" +%s%N)" || { B_ERR="Failed to parse the following timestamp: $ts" ; B_E ; }
 TIMES["$id"]="${ts_ns::-6}"
 }
 
@@ -74,7 +74,7 @@ function parseQubesLog {
 local vm="$1"
 local line log re
 
-log="$(set -e -o pipefail ; journalctl -u "qubesd" -b0 -o short-precise | grep "$vm")" || { B_ERR="Failed to read the journal." ; B_E }
+log="$(set -e -o pipefail ; journalctl -u "qubesd" -b0 -o short-precise | grep "$vm")" || { B_ERR="Failed to read the journal." ; B_E ; }
 re='^([^ ]+ [^ ]+ [^ ]+) dom0 ([^ ]+ [^ ]+ .*)$'
 
 while IFS= read -r line ; do
@@ -106,7 +106,7 @@ local id="$2"
 [ -z "$chain" ] && TIMES["$id"]="n/a" && return 0
 
 local re=' @([0-9\.]+)(m?s)' #simply match on the first
-[[ "$chain" =~ $re ]] || { B_ERR="Unexpected critical chain format for $id. Please investigate." ; B_E }
+[[ "$chain" =~ $re ]] || { B_ERR="Unexpected critical chain format for $id. Please investigate." ; B_E ; }
 local duration="${BASH_REMATCH[1]}"
 duration="${duration/\./}"
 TIMES["$id"]="$duration"
@@ -134,11 +134,11 @@ b_args_getOption "-h" > /dev/null && usage
 
 local vm="$(b_args_get 0)"
 
-b_dom0_isHalted "$vm" || { B_ERR="The VM $vm must be halted." ; B_E }
+b_dom0_isHalted "$vm" || { B_ERR="The VM $vm must be halted." ; B_E ; }
 
 if ! b_args_getOption "-p" > /dev/null ; then
   measure "t_qrexec_start"
-  qvm-run -p "$vm" 'date +%s%N &> /tmp/qubes-performance.txt ; echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E }
+  qvm-run -p "$vm" 'date +%s%N &> /tmp/qubes-performance.txt ; echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E ; }
   measure "t_qrexec_end"
 else
   local ofile="$vm.perf"
@@ -147,35 +147,35 @@ else
 
   measure "t_qrexec_start"
   #NOTE: we need sudo to collect as many events as possible
-  sudo perf record --call-graph dwarf -o "$ofile" -- qvm-run -p "$vm" 'date +%s%N &> /tmp/qubes-performance.txt ; echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E }
+  sudo perf record --call-graph dwarf -o "$ofile" -- qvm-run -p "$vm" 'date +%s%N &> /tmp/qubes-performance.txt ; echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E ; }
   measure "t_qrexec_end"
 fi
 
 #2nd qrexec call on running VM
 measure "t_qrexec2_start"
-qvm-run -p "$vm" 'date +%s%N &>> /tmp/qubes-performance.txt ; echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E }
+qvm-run -p "$vm" 'date +%s%N &>> /tmp/qubes-performance.txt ; echo hello' < /dev/null > /dev/null || { B_ERR="Failed to execute qvm-run." ; B_E ; }
 measure "t_qrexec2_end"
 
-TIMES["d_kernel"]="$(b_types_str b_dom0_execStrIn "$vm" "systemctl is-system-running --wait &> /dev/null ; systemd-analyze time")" || { B_ERR="Failed to obtain the systemd timings." ; B_E }
+TIMES["d_kernel"]="$(b_types_str b_dom0_execStrIn "$vm" "systemctl is-system-running --wait &> /dev/null ; systemd-analyze time")" || { B_ERR="Failed to obtain the systemd timings." ; B_E ; }
 local re=' ([0-9]+)\.([0-9]+)s \(kernel\)'
-[[ ${TIMES["d_kernel"]} =~ $re ]] || { B_ERR="Unexpected kernel output from the VM $vm. Maybe an attack?" ; B_E }
+[[ ${TIMES["d_kernel"]} =~ $re ]] || { B_ERR="Unexpected kernel output from the VM $vm. Maybe an attack?" ; B_E ; }
 TIMES["d_kernel"]="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
 
 local crit_chain_system crit_chain_user crit_chain_qrexec
-crit_chain_system="$(b_types_str b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the system critical chain." ; B_E }
+crit_chain_system="$(b_types_str b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the system critical chain." ; B_E ; }
 crit_chain_user="$(b_types_str b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze --user critical-chain | tail -n+4")" || { crit_chain_user="" ; b_error "Failed to obtain the user critical chain." ; }
-crit_chain_qrexec="$(b_types_str b_dom0_execStrIn "$vm" "systemd-analyze critical-chain qubes-qrexec-agent.service | tail -n+4")" || { B_ERR="Failed to obtain the qubes-qrexec-agent timings." ; B_E }
+crit_chain_qrexec="$(b_types_str b_dom0_execStrIn "$vm" "systemd-analyze critical-chain qubes-qrexec-agent.service | tail -n+4")" || { B_ERR="Failed to obtain the qubes-qrexec-agent timings." ; B_E ; }
 
 local untrusted untrusted_line
-untrusted="$(b_types_str b_dom0_execStrIn "$vm" "set -e -o pipefail ; cat /tmp/qubes-performance.txt ; rm -f /tmp/qubes-performance.txt")" || { B_ERR="Failed to obtain the system time." ; B_E }
+untrusted="$(b_types_str b_dom0_execStrIn "$vm" "set -e -o pipefail ; cat /tmp/qubes-performance.txt ; rm -f /tmp/qubes-performance.txt")" || { B_ERR="Failed to obtain the system time." ; B_E ; }
 local re='^[0-9]+$'
 IFS= read -r untrusted_line <<< "$untrusted"
-[[ $untrusted_line =~ $re ]] && TIMES["t_exec"]="${untrusted_line::-6}" || { B_ERR="Unexpected output from the VM $vm. Maybe an attack?" ; B_E }
+[[ $untrusted_line =~ $re ]] && TIMES["t_exec"]="${untrusted_line::-6}" || { B_ERR="Unexpected output from the VM $vm. Maybe an attack?" ; B_E ; }
 { IFS= read -r untrusted_line ; IFS= read -r untrusted_line ; } <<< "$untrusted"
-[[ $untrusted_line =~ $re ]] && TIMES["t_exec2"]="${untrusted_line::-6}" || { B_ERR="Unexpected output from the VM $vm. Maybe an attack?" ; B_E }
+[[ $untrusted_line =~ $re ]] && TIMES["t_exec2"]="${untrusted_line::-6}" || { B_ERR="Unexpected output from the VM $vm. Maybe an attack?" ; B_E ; }
 
 if ! b_args_getOption "-k" > /dev/null ; then
-  qvm-shutdown "$vm" || { B_ERR="Failed to shut down the VM $vm." ; B_E }
+  qvm-shutdown "$vm" || { B_ERR="Failed to shut down the VM $vm." ; B_E ; }
 fi
 
 #parse
