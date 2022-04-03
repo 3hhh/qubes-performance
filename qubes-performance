@@ -103,6 +103,7 @@ return 0
 function parseCritChain {
 local chain="$1"
 local id="$2"
+[ -z "$chain" ] && TIMES["$id"]="n/a" && return 0
 
 local re=' @([0-9\.]+)(m?s)' #simply match on the first
 [[ "$chain" =~ $re ]] || { B_ERR="Unexpected critical chain format for $id. Please investigate." ; B_E }
@@ -162,7 +163,7 @@ TIMES["d_kernel"]="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
 
 local crit_chain_system crit_chain_user crit_chain_qrexec
 crit_chain_system="$(b_types_str b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the system critical chain." ; B_E }
-crit_chain_user="$(b_types_str b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze --user critical-chain | tail -n+4")" || { B_ERR="Failed to obtain the user critical chain." ; B_E }
+crit_chain_user="$(b_types_str b_dom0_execStrIn "$vm" "set -e -o pipefail ; systemd-analyze --user critical-chain | tail -n+4")" || { crit_chain_user="" ; b_error "Failed to obtain the user critical chain." ; }
 crit_chain_qrexec="$(b_types_str b_dom0_execStrIn "$vm" "systemd-analyze critical-chain qubes-qrexec-agent.service | tail -n+4")" || { B_ERR="Failed to obtain the qubes-qrexec-agent timings." ; B_E }
 
 local untrusted untrusted_line
