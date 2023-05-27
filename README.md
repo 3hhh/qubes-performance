@@ -66,6 +66,8 @@ You're installing something to dom0 after all.
 
 Execute `qubes-performance` for a usage description.
 
+The `samples` directory contains some sample files to compare your results to. Pull requests to add your own samples are always welcome!
+
 ## Uninstall
 
 1. Remove all symlinks that you created during the installation.
@@ -74,7 +76,7 @@ Execute `qubes-performance` for a usage description.
 
 ## Copyright
 
-© 2021 David Hobach
+© 2023 David Hobach
 GPLv3
 
 See `LICENSE` for details.

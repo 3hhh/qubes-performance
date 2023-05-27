@@ -1,0 +1,53 @@
+Qubes release 4.1.2 (R4.1)
+dom0 kernel: 6.2.10-1.qubes.fc32.x86_64
+dom0 Xen: 4.14.5
+VM kernel: pvgrub2-pvh
+
+Xen:
+  qrexec startup: 163 ms
+  Qubes DB: 2356 ms
+  VM handover: 2436 ms
+Linux:
+  kernel: 10423 ms
+  system: 3305 ms
+  user: 86 ms
+  system critical-chain:
+    multi-user.target @3.305s
+    └─qubes-misc-post.service @2.909s +395ms
+      └─basic.target @2.581s
+        └─sockets.target @2.581s
+          └─qubes-updates-proxy-forwarder.socket @2.581s
+            └─sysinit.target @2.573s
+              └─systemd-update-utmp.service @2.556s +15ms
+                └─systemd-tmpfiles-setup.service @2.440s +112ms
+                  └─systemd-journal-flush.service @1.056s +1.366s
+                    └─systemd-journald.service @956ms +99ms
+                      └─systemd-journald.socket @905ms
+                        └─system.slice @824ms
+                          └─-.slice @824ms
+  qrexec service critical-chain:
+    qubes-qrexec-agent.service +46ms
+    └─systemd-user-sessions.service @2.910s +10ms
+      └─network.target @2.908s
+        └─qubes-network-uplink.service @2.591s +28ms
+          └─basic.target @2.581s
+            └─sockets.target @2.581s
+              └─qubes-updates-proxy-forwarder.socket @2.581s
+                └─sysinit.target @2.573s
+                  └─systemd-update-utmp.service @2.556s +15ms
+                    └─systemd-tmpfiles-setup.service @2.440s +112ms
+                      └─systemd-journal-flush.service @1.056s +1.366s
+                        └─systemd-journald.service @956ms +99ms
+                          └─systemd-journald.socket @905ms
+                            └─system.slice @824ms
+                              └─-.slice @824ms
+  qubes.GetDate: n/a
+  qubes.WindowIconUpdater: n/a
+  qrexec service: 2910 ms
+qrexec (1st run):
+  exec time: 6293 ms (depends on clock sync)
+  return: 6233 ms
+qrexec (2nd run):
+  exec time: 489 ms (depends on clock sync)
+  return: 434 ms
+Overall: 22165 ms (excl. 2nd qrexec run)
