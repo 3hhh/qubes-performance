@@ -2,8 +2,8 @@
 #
 #See usage().
 #
-#Copyright (C) 2022  David Hobach  GPLv3
-#version: 0.7
+#Copyright (C) 2023  David Hobach  GPLv3
+#version: 0.8
 #
 #This program is free software: you can redistribute it and/or modify
 #it under the terms of the GNU General Public License as published by
@@ -191,12 +191,18 @@ local getDate=$(( ${TIMES["t_qubes_get_date"]} - ${TIMES["t_xen_end"]} - ${TIMES
 local windowIcon=$(( ${TIMES["t_qubes_window_icon_updater"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_qrexec"]} - ${TIMES["d_kernel"]} ))
 [ $windowIcon -gt 0 ] && windowIcon="$windowIcon ms" || windowIcon="n/a"
 
+local memMin="$(qvm-prefs "$vm" "memory")" || { B_ERR="Failed to obtain memory size for the VM $vm." ; B_E ; }
+local memMax="$(qvm-prefs "$vm" "maxmem")" || { B_ERR="Failed to obtain maxmem size for the VM $vm." ; B_E ; }
+local memStr="$memMin - $memMax MB"
+[ $memMax -le 0 ] && memMax="$memMin" && memStr="$memMax MB"
+
 #print header
 if ! b_args_getOption "-n" > /dev/null ; then
   cat "/etc/qubes-release"
   echo "dom0 kernel: $(uname -r)
 dom0 Xen: $(get_xen_version)
-VM kernel: $(qvm-prefs "$vm" "kernel")"$'\n'
+VM kernel: $(qvm-prefs "$vm" "kernel")
+VM memory: $memStr"$'\n'
 fi
 
 #print performance info
@@ -221,7 +227,8 @@ qrexec (1st run):
 qrexec (2nd run):
   exec time: $(( ${TIMES["t_exec2"]} - ${TIMES["t_qrexec2_start"]} )) ms (depends on clock sync)
   return: $(( ${TIMES["t_qrexec2_end"]} - ${TIMES["t_qrexec2_start"]} )) ms
-Overall: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_qrexec_start"]} )) ms (excl. 2nd qrexec run)"
+Overall: $(( ${TIMES["t_qrexec_end"]} - ${TIMES["t_qrexec_start"]} )) ms (excl. 2nd qrexec run)
+         $(( ( ${TIMES["t_qrexec_end"]} - ${TIMES["t_qrexec_start"]} ) * 1024 / ( $memMin + ( ( $memMax - $memMin ) / 2 ) ) )) ms / GB memory"
 }
 
 main "$@"
