@@ -194,7 +194,7 @@ local windowIcon=$(( ${TIMES["t_qubes_window_icon_updater"]} - ${TIMES["t_xen_en
 local memMin="$(qvm-prefs "$vm" "memory")" || { B_ERR="Failed to obtain memory size for the VM $vm." ; B_E ; }
 local memMax="$(qvm-prefs "$vm" "maxmem")" || { B_ERR="Failed to obtain maxmem size for the VM $vm." ; B_E ; }
 local memStr="$memMin - $memMax MB"
-[ $memMax -le 0 ] && memMax="$memMin" && memStr="$memMax MB"
+[ $memMax -le $memMin ] && memMax="$memMin" && memStr="$memMax MB"
 
 #print header
 if ! b_args_getOption "-n" > /dev/null ; then
