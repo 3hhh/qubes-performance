@@ -3,7 +3,7 @@
 #See usage().
 #
 #Copyright (C) 2023  David Hobach  GPLv3
-#version: see version()
+#version: see $VERSION
 #
 #This program is free software: you can redistribute it and/or modify
 #it under the terms of the GNU General Public License as published by
@@ -18,6 +18,8 @@
 #You should have received a copy of the GNU General Public License
 #along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
+
+VERSION="0.8"
 
 source blib
 eval "$B_SCRIPT"
@@ -35,10 +37,6 @@ b_dom0_setVMDeps "systemd-analyze"$'\n'"tail"
 #t_: time in ms since epoch, d_: duration in ms
 declare -A TIMES=()
 
-function version {
-echo "0.8"
-}
-
 function usage {
 echo "Usage: $B_SCRIPT_NAME [options] [vm]
 
@@ -49,7 +47,7 @@ Analyze the VM startup performance of Qubes OS.
 [options]:
   -k: Keep the VM running (default: shut it down).
   -p: Store perf data in [vm].perf (will overwrite!)
-  -n: Don't print the kernel & Xen version header.
+  -n: Don't print the header.
   -h: Print this help and exit."
 exit 1
 }
@@ -202,7 +200,7 @@ local memStr="$memMin - $memMax MB"
 
 #print header
 if ! b_args_getOption "-n" > /dev/null ; then
-  echo "qubes-performance $(version)"$'\n'
+  echo "qubes-performance $VERSION"$'\n'
   cat "/etc/qubes-release"
   echo "dom0 kernel: $(uname -r)
 dom0 Xen: $(get_xen_version)
