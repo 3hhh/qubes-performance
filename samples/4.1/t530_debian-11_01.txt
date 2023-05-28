@@ -1,3 +1,5 @@
+qubes-performance 0.8
+
 Qubes release 4.1.2 (R4.1)
 dom0 kernel: 6.2.10-1.qubes.fc32.x86_64
 dom0 Xen: 4.14.5

@@ -3,7 +3,7 @@
 #See usage().
 #
 #Copyright (C) 2023  David Hobach  GPLv3
-#version: 0.8
+#version: see version()
 #
 #This program is free software: you can redistribute it and/or modify
 #it under the terms of the GNU General Public License as published by
@@ -34,6 +34,10 @@ b_dom0_setVMDeps "systemd-analyze"$'\n'"tail"
 #time measurements
 #t_: time in ms since epoch, d_: duration in ms
 declare -A TIMES=()
+
+function version {
+echo "0.8"
+}
 
 function usage {
 echo "Usage: $B_SCRIPT_NAME [options] [vm]
@@ -198,6 +202,7 @@ local memStr="$memMin - $memMax MB"
 
 #print header
 if ! b_args_getOption "-n" > /dev/null ; then
+  echo "qubes-performance $(version)"$'\n'
   cat "/etc/qubes-release"
   echo "dom0 kernel: $(uname -r)
 dom0 Xen: $(get_xen_version)
