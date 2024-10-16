@@ -22,9 +22,11 @@
 VERSION="0.8"
 
 source blib
+b_checkVersion 1 6 || { >&2 echo "This script depends on blib (https://github.com/3hhh/blib) version 1.6 or higher. Please install a supported version." ; exit 1 ; }
 eval "$B_SCRIPT"
 b_import "args"
 b_import "types"
+b_import "str"
 b_import "os/qubes4/dom0"
 
 B_TYPES_ENCODING="utf-8"
@@ -74,13 +76,13 @@ TIMES["$id"]="${ts_ns::-6}"
 #parseQubesLog [vm]
 function parseQubesLog {
 local vm="$1"
-local line log re
+local log re
 
 log="$(set -e -o pipefail ; journalctl -u "qubesd" -b0 -o short-precise | grep "$vm")" || { B_ERR="Failed to read the journal." ; B_E ; }
 re='^([^ ]+ [^ ]+ [^ ]+) dom0 ([^ ]+ [^ ]+ .*)$'
 
-while IFS= read -r line ; do
-  [[ "$line" =~ $re ]] || continue
+while b_readLine ; do
+  [[ "$B_LINE" =~ $re ]] || continue
   local ts="${BASH_REMATCH[1]}"
   local msg="${BASH_REMATCH[2]}"
 
@@ -112,16 +114,6 @@ local re=' @([0-9\.]+)(m?s)' #simply match on the first
 local duration="${BASH_REMATCH[1]}"
 duration="${duration/\./}"
 TIMES["$id"]="$duration"
-}
-
-function prefix {
-local prefix="$1"
-local txt="$2"
-
-local line=
-while IFS= read -r line ; do
-  echo "$prefix$line"
-done <<< "$txt"
 }
 
 function get_xen_version {
@@ -171,9 +163,9 @@ crit_chain_qrexec="$(b_types_str b_dom0_execStrIn "$vm" "systemd-analyze critica
 local untrusted untrusted_line
 untrusted="$(b_types_str b_dom0_execStrIn "$vm" "set -e -o pipefail ; cat /tmp/qubes-performance.txt ; rm -f /tmp/qubes-performance.txt")" || { B_ERR="Failed to obtain the system time." ; B_E ; }
 local re='^[0-9]+$'
-IFS= read -r untrusted_line <<< "$untrusted"
+b_readLine untrusted_line <<< "$untrusted"
 [[ $untrusted_line =~ $re ]] && TIMES["t_exec"]="${untrusted_line::-6}" || { B_ERR="Unexpected output from the VM $vm. Maybe an attack?" ; B_E ; }
-{ IFS= read -r untrusted_line ; IFS= read -r untrusted_line ; } <<< "$untrusted"
+{ b_readLine untrusted_line ; b_readLine untrusted_line ; } <<< "$untrusted"
 [[ $untrusted_line =~ $re ]] && TIMES["t_exec2"]="${untrusted_line::-6}" || { B_ERR="Unexpected output from the VM $vm. Maybe an attack?" ; B_E ; }
 
 if ! b_args_getOption "-k" > /dev/null ; then
@@ -218,9 +210,9 @@ Linux:
   system: ${TIMES["d_crit_system"]} ms
   user: ${TIMES["d_crit_user"]} ms
   system critical-chain:
-$(prefix "    " "$crit_chain_system")
+$(b_str_prefixLines "$crit_chain_system" "    ")
   qrexec service critical-chain:
-$(prefix "    " "$crit_chain_qrexec")
+$(b_str_prefixLines "$crit_chain_qrexec" "    ")
   qubes.GetDate: $getDate
   qubes.WindowIconUpdater: $windowIcon
   qrexec service: ${TIMES["d_crit_qrexec"]} ms
