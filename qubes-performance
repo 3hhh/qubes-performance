@@ -2,7 +2,7 @@
 #
 #See usage().
 #
-#Copyright (C) 2023  David Hobach  GPLv3
+#Copyright (C) 2025  David Hobach  GPLv3
 #version: see $VERSION
 #
 #This program is free software: you can redistribute it and/or modify
@@ -32,7 +32,7 @@ b_import "os/qubes4/dom0"
 B_TYPES_ENCODING="utf-8"
 B_DOM0_QVM_RUN_PARAMS=("--no-gui")
 
-b_deps "qvm-run" "qvm-shutdown" "date" "tail" "journalctl" "grep" "touch" "perf" "sudo" "sed" "xl" "uname" "cat" "qvm-prefs"
+b_deps "qvm-run" "qvm-shutdown" "date" "tail" "journalctl" "grep" "touch" "perf" "sudo" "xl" "uname" "cat" "qvm-prefs"
 b_dom0_setVMDeps "systemd-analyze"$'\n'"tail"
 
 #time measurements
@@ -116,8 +116,15 @@ duration="${duration/\./}"
 TIMES["$id"]="$duration"
 }
 
-function get_xen_version {
-xl info | sed -rn 's/xen_version\s+:\s+([0-9\.]+)/\1/p'
+function getXenVersion {
+local ret=
+ret="$(xl info)" || { B_ERR="Failed to execute xl info." ; B_E ; }
+local re='^xen_version[ ]*:[ ]*(.*)$'
+local found=1
+while b_readLine ; do
+  [[ "$B_LINE" =~ $re ]] && echo "${BASH_REMATCH[1]}" && found=0
+done <<< "$ret"
+[ $found -eq 0 ] || { B_ERR="Failed to find the xen_version inside the xl info output. Programming error?!" ; B_E ; }
 }
 
 function main {
@@ -195,7 +202,7 @@ if ! b_args_getOption "-n" > /dev/null ; then
   echo "qubes-performance $VERSION"$'\n'
   cat "/etc/qubes-release"
   echo "dom0 kernel: $(uname -r)
-dom0 Xen: $(get_xen_version)
+dom0 Xen: $(getXenVersion)
 VM kernel: $(qvm-prefs "$vm" "kernel")
 VM memory: $memStr"$'\n'
 fi
