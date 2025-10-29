@@ -198,9 +198,10 @@ local getDate=$(( ${TIMES["t_qubes_get_date"]} - ${TIMES["t_xen_end"]} - ${TIMES
 local windowIcon=$(( ${TIMES["t_qubes_window_icon_updater"]} - ${TIMES["t_xen_end"]} - ${TIMES["d_crit_qrexec"]} - ${TIMES["d_kernel"]} ))
 [ $windowIcon -gt 0 ] && windowIcon="$windowIcon ms" || windowIcon="n/a"
 
-local memMin="$(qvm-prefs "$vm" "memory")" || { B_ERR="Failed to obtain memory size for the VM $vm." ; B_E ; }
-local memMax="$(qvm-prefs "$vm" "maxmem")" || { B_ERR="Failed to obtain maxmem size for the VM $vm." ; B_E ; }
-local memStr="$memMin - $memMax MB"
+local memMin memMax memStr
+memMin="$(qvm-prefs "$vm" "memory")" || { B_ERR="Failed to obtain memory size for the VM $vm." ; B_E ; }
+memMax="$(qvm-prefs "$vm" "maxmem")" || { B_ERR="Failed to obtain maxmem size for the VM $vm." ; B_E ; }
+memStr="$memMin - $memMax MB"
 [ $memMax -le $memMin ] && memMax="$memMin" && memStr="$memMax MB"
 
 #print header
