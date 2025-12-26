@@ -1,0 +1,60 @@
+qubes-performance 0.9
+
+Qubes release 4.2.4 (R4.2)
+dom0 kernel: 6.17.9-1.qubes.fc37.x86_64
+dom0 Xen: 4.17.5
+VM kernel: pvgrub2-pvh
+VM memory: 400 MB
+running VMs: 15
+
+Xen:
+  qrexec startup: 388 ms
+  Qubes DB: 1139 ms
+  VM handover: 1755 ms
+Linux:
+  kernel: 3832 ms
+  system: 3240 ms
+  user: 252 ms
+  system critical-chain:
+    multi-user.target @3.240s
+    └─qubes-misc-post.service @2.896s +342ms
+      └─network-pre.target @2.888s
+        └─qubes-iptables.service @2.556s +331ms
+          └─qubes-antispoof.service @2.285s +266ms
+            └─basic.target @2.245s
+              └─sockets.target @2.244s
+                └─systemd-hostnamed.socket @2.244s
+                  └─sysinit.target @2.202s
+                    └─systemd-binfmt.service @1.984s +217ms
+                      └─proc-sys-fs-binfmt_misc.mount @2.164s +34ms
+                        └─systemd-journald.socket @1.064s
+                          └─system.slice @1.018s
+                            └─-.slice @1.018s
+  qrexec service critical-chain:
+    qubes-qrexec-agent.service +84ms
+    └─systemd-user-sessions.service @3.008s +25ms
+      └─network.target @3.001s
+        └─networking.service @2.890s +109ms
+          └─network-pre.target @2.888s
+            └─qubes-iptables.service @2.556s +331ms
+              └─qubes-antispoof.service @2.285s +266ms
+                └─basic.target @2.245s
+                  └─sockets.target @2.244s
+                    └─systemd-hostnamed.socket @2.244s
+                      └─sysinit.target @2.202s
+                        └─systemd-binfmt.service @1.984s +217ms
+                          └─proc-sys-fs-binfmt_misc.mount @2.164s +34ms
+                            └─systemd-journald.socket @1.064s
+                              └─system.slice @1.018s
+                                └─-.slice @1.018s
+  qubes.GetDate: n/a
+  qubes.WindowIconUpdater: n/a
+  qrexec service: 3008 ms
+qrexec (1st run):
+  exec time: 4777 ms (depends on clock sync)
+  return: 4840 ms
+qrexec (2nd run):
+  exec time: 666 ms (depends on clock sync)
+  return: 708 ms
+Overall: 13823 ms (excl. 2nd qrexec run)
+         35386 ms / GB memory
