@@ -19,7 +19,7 @@
 #along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 
-VERSION="0.9"
+VERSION="1.0"
 
 source blib
 b_checkVersion 1 6 || { >&2 echo "This script depends on blib (https://github.com/3hhh/blib) version 1.6 or higher. Please install a supported version." ; exit 1 ; }
@@ -86,11 +86,15 @@ while b_readLine ; do
   local ts="${BASH_REMATCH[1]}"
   local msg="${BASH_REMATCH[2]}"
 
-  if [[ "$msg" == *"Starting $vm" ]] ; then
+  if [[ "$msg" == *"Starting $vm" ]] ; then #4.2
+    parseQubesLogTimestamp "$ts" "t_xen_start"
+  elif [[ "$msg" == *"Starting qube $vm" ]] ; then #4.3
     parseQubesLogTimestamp "$ts" "t_xen_start"
   elif [[ "$msg" == *"Starting Qubes DB" ]] ; then
     parseQubesLogTimestamp "$ts" "t_xen_qubesdb_start"
-  elif [[ "$msg" == *"Activating the $vm VM" ]] ; then
+  elif [[ "$msg" == *"Activating the $vm VM" ]] ; then #4.2
+    parseQubesLogTimestamp "$ts" "t_xen_end"
+  elif [[ "$msg" == *"Activating qube" ]] ; then #4.3
     parseQubesLogTimestamp "$ts" "t_xen_end"
   elif [[ "$msg" == *"qubes.GetDate"*"allowed"* ]] ; then
     parseQubesLogTimestamp "$ts" "t_qubes_get_date"
