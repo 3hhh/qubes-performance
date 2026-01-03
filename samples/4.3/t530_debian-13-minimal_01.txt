@@ -1,0 +1,66 @@
+qubes-performance 1.0
+
+Qubes release 4.3.0 (R4.3)
+dom0 kernel: 6.17.9-1.qubes.fc41.x86_64
+dom0 Xen: 4.19.3
+VM kernel: pvgrub2-pvh
+VM memory: 400 MB
+running VMs: 16
+
+Xen:
+  qrexec startup: 218 ms
+  Qubes DB: 251 ms
+  VM handover: 379 ms
+Linux:
+  kernel: 4173 ms
+  system: 3444 ms
+  user: 249 ms
+  system critical-chain:
+    multi-user.target @3.444s
+    └─qubes-misc-post.service @3.026s +292ms
+      └─network-pre.target @3.023s
+        └─qubes-iptables.service @2.736s +286ms
+          └─qubes-antispoof.service @2.520s +213ms
+            └─basic.target @2.496s
+              └─sockets.target @2.495s
+                └─systemd-hostnamed.socket @2.495s
+                  └─sysinit.target @2.480s
+                    └─systemd-tmpfiles-setup.service @2.405s +74ms
+                      └─qubes-bind-dirs.service @2.352s +49ms
+                        └─local-fs.target @2.348s
+                          └─run-user-1000.mount @3.483s
+                            └─swap.target @1.844s
+                              └─dev-zram0.swap @1.809s +32ms
+                                └─systemd-zram-setup@zram0.service @1.733s +71ms
+                                  └─dev-zram0.device @1.731s
+  qrexec service critical-chain:
+    qubes-qrexec-agent.service +89ms
+    └─systemd-user-sessions.service @3.129s +37ms
+      └─network.target @3.127s
+        └─networking.service @3.025s +101ms
+          └─network-pre.target @3.023s
+            └─qubes-iptables.service @2.736s +286ms
+              └─qubes-antispoof.service @2.520s +213ms
+                └─basic.target @2.496s
+                  └─sockets.target @2.495s
+                    └─systemd-hostnamed.socket @2.495s
+                      └─sysinit.target @2.480s
+                        └─systemd-tmpfiles-setup.service @2.405s +74ms
+                          └─qubes-bind-dirs.service @2.352s +49ms
+                            └─local-fs.target @2.348s
+                              └─run-user-1000.mount @3.483s
+                                └─swap.target @1.844s
+                                  └─dev-zram0.swap @1.809s +32ms
+                                    └─systemd-zram-setup@zram0.service @1.733s +71ms
+                                      └─dev-zram0.device @1.731s
+  qubes.GetDate: n/a
+  qubes.WindowIconUpdater: n/a
+  qrexec service: 3129 ms
+qrexec (1st run):
+  exec time: 4758 ms (depends on clock sync)
+  return: 4837 ms
+qrexec (2nd run):
+  exec time: 606 ms (depends on clock sync)
+  return: 651 ms
+Overall: 12736 ms (excl. 2nd qrexec run)
+         32604 ms / GB memory
